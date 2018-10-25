@@ -15,7 +15,7 @@ from sklearn.linear_model import LogisticRegression
 warnings.filterwarnings("ignore")
 
 def plot(x,y,x_label='X-Axis',y_label='Y-Axis'):
-    fig, ax =plt.subplots(figsize=(10,7))
+    fig, ax =plt.subplots(figsize=(10,6))
     ax.scatter(x, y)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
