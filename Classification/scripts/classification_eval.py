@@ -58,7 +58,7 @@ def main(intervals,cv_scheme):
                         random_state=0)
         else:
             cv_arg = int(num_data_pts/train_size)
-            if cv_arg<2:
+            if cv_arg<4:
                 break
 
         scores = model_selection.cross_validate(model, X, y, scoring=scoring,
@@ -92,8 +92,8 @@ if __name__=='__main__':
     if not args.intervals:
         args.intervals = DEFAULT_INTERVALS
     else:
-        if not args.intervals >= 5:
-            raise Exception('Intervals cannot be less than 5')
+        if args.intervals < 4:
+            raise Exception('Intervals cannot be less than 4')
 
     if args.xy_split and args.kfolds:
         raise Exception('Only a single cross validation scheme can be specified ata  time')
