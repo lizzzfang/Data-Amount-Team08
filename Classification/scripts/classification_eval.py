@@ -1,54 +1,112 @@
 '''
 Created on Oct 19, 2018
 
-@author: Saad
+@author: Geese Howard
 
 '''
 import os
 import pandas
+import argparse
 import warnings
 import matplotlib.pylab as plt
-from sklearn import metrics
 from sklearn import model_selection
 from sklearn.linear_model import LogisticRegression
 
 warnings.filterwarnings("ignore")
+DEFAULT_INTERVALS = 1000
+SCRIPT_DIR = os.path.abspath(os.path.join(__file__,os.pardir))
+OUTPUT_DIR = os.path.join(SCRIPT_DIR,'output')
 
 def plot(x,y,x_label='X-Axis',y_label='Y-Axis'):
-    fig, ax =plt.subplots(figsize=(10,6))
-    ax.scatter(x, y)
+    fig, ax =plt.subplots(figsize=(10,10))
+    ax.plot(x,y)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     return (fig,ax)
 
 def save_plot(fig,outfile):
-    fig.savefig('%s.png'%outfile)
+    output_filepath = os.path.join(OUTPUT_DIR,outfile)
+    fig.savefig('%s.png'%output_filepath)
 
-def main():
-    SCRIPT_DIR = os.path.abspath(os.path.join(__file__,os.pardir))
-    dataset_path = os.path.join(SCRIPT_DIR,os.pardir,'datasets','classification',
+def main(intervals,cv_scheme):
+    dataset_path = os.path.join(SCRIPT_DIR,os.pardir,'datasets',
                        'dataset1','dataset1_formatted.csv')
     df = pandas.read_csv(dataset_path)
     array = df.values
     num_data_pts = len(array)
-    step = int(num_data_pts/1000)
+    step = int(num_data_pts/intervals)
 
     train_sizes = list(range(step,num_data_pts,step))
+    X=array[:,:-1]
+    y=array[:,-1]
+    scoring = {'acc': 'accuracy',
+               'n_loss':'neg_log_loss',
+               'msqerr':'neg_mean_squared_error',
+               'r2':'r2'}
+
+    accuracy = []
+    neg_log_loss = []
+    neg_mean_sq_err = []
+    r2 = []
+    train_sizes_X = []
 
     for train_size in train_sizes:
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(array[:,:-1],
-                                                array[:,-1],train_size=train_size)
         model = LogisticRegression()
-        model.fit(X_train,y_train)
-        
-        predictions = model.predict(X_test)
+        if cv_scheme == 0:
+            cv_arg = model_selection.ShuffleSplit(n_splits=2,
+                        train_size=train_size, test_size=num_data_pts-train_size,
+                        random_state=0)
+        else:
+            cv_arg = int(num_data_pts/train_size)
+            if cv_arg<2:
+                break
 
-        print("---------------------")
-        print("Train data size: %d." % X_train.shape[0])
-        print("Test data size: %d." % X_test.shape[0])
-        print("Accuracy: %.3f %%" % (metrics.accuracy_score(y_test, predictions)*100))
-        print("Log loss: %.3f" % metrics.log_loss(y_test, predictions))
-        print("---------------------")
+        scores = model_selection.cross_validate(model, X, y, scoring=scoring,
+                                 cv=cv_arg, return_train_score=False)
+
+        train_sizes_X.append(train_size)
+        neg_log_loss.append(scores['test_n_loss'].mean())
+        accuracy.append(scores['test_acc'].mean())
+        neg_mean_sq_err.append(scores['test_msqerr'].mean())
+        r2.append(scores['test_r2'].mean())
+
+    x_label = 'Number of Training samples'
+    p_acc = plot(train_sizes_X,accuracy,x_label=x_label,y_label='Accuracy')
+    p_lloss = plot(train_sizes_X,neg_log_loss,x_label=x_label,y_label='Negative Log Loss')
+    p_msq = plot(train_sizes_X,neg_mean_sq_err,x_label=x_label,y_label='Mean Squared Error')
+    p_r2 = plot(train_sizes_X,r2,x_label=x_label,y_label='R2')
+    save_plot(p_acc[0],'accuracy')
+    save_plot(p_lloss[0],'log_loss')
+    save_plot(p_msq[0],'mean_squared')
+    save_plot(p_r2[0],'r2')
 
 if __name__=='__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Argument parser of classification'\
+                                                'evaluation script')
+    parser.add_argument('--intervals', type=int,help='How many intervals to divide the dataset into')
+    parser.add_argument('--xy_split', action='store_true')
+    parser.add_argument('--kfolds', action='store_true')
+
+    args = parser.parse_args()
+    
+    if not args.intervals:
+        args.intervals = DEFAULT_INTERVALS
+    else:
+        if not args.intervals >= 5:
+            raise Exception('Intervals cannot be less than 5')
+
+    if args.xy_split and args.kfolds:
+        raise Exception('Only a single cross validation scheme can be specified ata  time')
+    elif not args.xy_split and not args.kfolds:
+        cv_scheme = 0
+    elif args.xy_split:
+        cv_scheme = 0
+    elif args.kfolds:
+        cv_scheme = 1
+    else:
+        raise Exception('Unhandled case')
+
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+
+    main(args.intervals,cv_scheme)
