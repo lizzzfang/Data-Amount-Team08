@@ -18,19 +18,23 @@ SCRIPT_DIR = os.path.abspath(os.path.join(__file__,os.pardir))
 OUTPUT_DIR = os.path.join(SCRIPT_DIR,'output')
 
 def plot(x,y,x_label='X-Axis',y_label='Y-Axis'):
-    fig, ax =plt.subplots(figsize=(10,10))
+    fig, ax = plt.subplots(figsize=(10,10))
     ax.plot(x,y)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     return (fig,ax)
 
-def save_plot(fig,outfile):
-    output_filepath = os.path.join(OUTPUT_DIR,outfile)
+def save_plot(fig,filename,save_to_dir=OUTPUT_DIR):
+    output_filepath = os.path.join(save_to_dir,filename)
     fig.savefig('%s.png'%output_filepath)
 
-def main(intervals,cv_scheme):
-    dataset_path = os.path.join(SCRIPT_DIR,os.pardir,'datasets',
-                       'dataset1','dataset1_formatted.csv')
+def main(dataset_path,intervals,cv_scheme):
+
+    dataset_filename = os.path.basename(dataset_path).split('.')[0]
+    ds_output = os.path.join(OUTPUT_DIR,dataset_filename)
+    if not os.path.exists(ds_output):
+        os.makedirs(ds_output)
+
     df = pandas.read_csv(dataset_path)
     array = df.values
     num_data_pts = len(array)
@@ -75,20 +79,27 @@ def main(intervals,cv_scheme):
     p_lloss = plot(train_sizes_X,neg_log_loss,x_label=x_label,y_label='Negative Log Loss')
     p_msq = plot(train_sizes_X,neg_mean_sq_err,x_label=x_label,y_label='Mean Squared Error')
     p_r2 = plot(train_sizes_X,r2,x_label=x_label,y_label='R2')
-    save_plot(p_acc[0],'accuracy')
-    save_plot(p_lloss[0],'log_loss')
-    save_plot(p_msq[0],'mean_squared')
-    save_plot(p_r2[0],'r2')
+    save_plot(p_acc[0],'accuracy',ds_output)
+    save_plot(p_lloss[0],'log_loss',ds_output)
+    save_plot(p_msq[0],'mean_squared',ds_output)
+    save_plot(p_r2[0],'r2',ds_output)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Argument parser of classification'\
                                                 'evaluation script')
+    parser.add_argument('--dset_path', type=str,help='Absolute path to the FORMATTED dataset')
     parser.add_argument('--intervals', type=int,help='How many intervals to divide the dataset into')
     parser.add_argument('--xy_split', action='store_true')
     parser.add_argument('--kfolds', action='store_true')
 
     args = parser.parse_args()
-    
+
+    if not args.dset_path:
+        raise Exception('Please provide the Dataset path using the --dset_path switch')
+    else:
+        if not os.path.exists(args.dset_path):
+            raise Exception('Dataset does not exist on the specified path')
+
     if not args.intervals:
         args.intervals = DEFAULT_INTERVALS
     else:
@@ -104,9 +115,10 @@ if __name__=='__main__':
     elif args.kfolds:
         cv_scheme = 1
     else:
-        raise Exception('Unhandled case')
+        #All 4 cases have been covered
+        pass
 
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
-    main(args.intervals,cv_scheme)
+    main(args.dset_path,args.intervals,cv_scheme)
